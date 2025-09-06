@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cmsr2",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-22",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/set-token/*"]
+  },
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "cmsr2"
+    },
+  ]
+}
