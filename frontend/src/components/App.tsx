@@ -3,7 +3,7 @@ import { css, Global } from "@emotion/react";
 import { useEffect, useState } from "react";
 
 import Navigation from "./Navigation";
-import { deleteKey, getKey, listKeys, upsertKey } from "../libs/api";
+import { deleteKey, getKey, listKeys, mvKey, upsertKey } from "../libs/api";
 import { saveToOPFS } from "../libs/opfs";
 
 const globalStyles = css`
@@ -72,11 +72,16 @@ const App = () => {
   const [body, setBody] = useState<string>("");
   const [savedBody, setSavedBody] = useState<string>("");
 
+  const normalizeKey = (key: string) => {
+    return key.replace(/^\//, "").replace(/\/$/, "");
+  };
+
   const upsertKeyInternally = async () => {
     try {
       await upsertKey(currentKey, body);
     } catch (e) {
       alert(`[upsertKey] ${e}`);
+      return;
     }
 
     try {
@@ -90,7 +95,7 @@ const App = () => {
   };
 
   const deleteKeyInternally = async () => {
-    const ok = confirm("Are you sure you want to delete this file?");
+    const ok = window.confirm("Are you sure you want to delete this file?");
     if (!ok) {
       return;
     }
@@ -98,22 +103,43 @@ const App = () => {
       await deleteKey(currentKey);
     } catch (e) {
       alert(`[deleteKey] ${e}`);
+      return;
     }
     updateKeys();
-    setCurrentKey("");
+    changeKey("");
+  };
+
+  const mvKeyInternally = async () => {
+    const newKey = window.prompt("Enter the new key");
+    if (newKey === "" || newKey === null) {
+      return;
+    }
+    try {
+      await mvKey(currentKey, newKey);
+    } catch (e) {
+      alert(`[mvKey] ${e}`);
+      return;
+    }
+    updateKeys();
+    changeKey(newKey);
   };
 
   const changeKey = (key: string) => {
     (async () => {
-      setCurrentKey(key);
+      const normalizedKey = normalizeKey(key);
+      setCurrentKey(normalizedKey);
 
       // URL を更新
       const url = new URL(document.location.href);
-      url.searchParams.set("key", `/${key}`);
-      history.replaceState({ key: `/${key}` }, "", url);
+      url.searchParams.set("key", `/${normalizedKey}`);
+      history.replaceState({ key: `/${normalizedKey}` }, "", url);
+
+      if (normalizedKey === "") {
+        return;
+      }
 
       try {
-        const text = await getKey(key);
+        const text = await getKey(normalizedKey);
         setBody(text);
         setSavedBody(text);
       } catch (e) {
@@ -176,6 +202,11 @@ const App = () => {
               type="button"
               value="Delete"
               onClick={() => deleteKeyInternally()}
+            />
+            <input
+              type="button"
+              value="Rename"
+              onClick={() => mvKeyInternally()}
             />
             {body !== savedBody && <Unsaved>未保存</Unsaved>}
           </Header>

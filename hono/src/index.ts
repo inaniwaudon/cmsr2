@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { R2Bucket } from "@cloudflare/workers-types";
 import { createMiddleware } from "hono/factory";
 import { getCookie, setCookie } from "hono/cookie";
+import z from "zod";
+import { zValidator } from "@hono/zod-validator";
 
 interface Bindings {
   R2: R2Bucket;
@@ -39,8 +41,12 @@ const authMiddleware = createMiddleware<{ Bindings: Bindings }>(
 app.use("/api/*", authMiddleware);
 
 const normalizeKey = (key: string) => {
-  // 末尾のスラッシュは削除
-  return key.replace(/\/$/, "");
+  // パストラバーサルを防ぐ
+  if (key.includes("..")) {
+    throw new Error("Invalid key");
+  }
+  // 先頭、末尾のスラッシュは削除
+  return key.replace(/^\//, "").replace(/\/$/, "");
 };
 
 app.get("/api/lists/:key{.*}", async (c) => {
@@ -58,7 +64,7 @@ app.get("/api/lists/:key{.*}", async (c) => {
 
 app.get("/api/files/:key{.+}", async (c) => {
   try {
-    const key = c.req.param("key");
+    const key = normalizeKey(c.req.param("key"));
     const object = await c.env.R2.get(key);
     if (!object) {
       return c.text("Not Found", 404);
@@ -70,9 +76,9 @@ app.get("/api/files/:key{.+}", async (c) => {
   }
 });
 
-app.post("/api/files/:key{.+}", async (c) => {
+app.put("/api/files/:key{.+}", async (c) => {
   try {
-    const key = c.req.param("key");
+    const key = normalizeKey(c.req.param("key"));
     const normalizedKey = normalizeKey(key);
     const body = await c.req.text();
     await c.env.R2.put(normalizedKey, body);
@@ -84,10 +90,41 @@ app.post("/api/files/:key{.+}", async (c) => {
 
 app.delete("/api/files/:key{.+}", async (c) => {
   try {
-    const key = c.req.param("key");
+    const key = normalizeKey(c.req.param("key"));
     const normalizedKey = normalizeKey(key);
     await c.env.R2.delete(normalizedKey);
     return c.text("Deleted", 200);
+  } catch (e) {
+    return c.text(`Internal Server Error: ${e}`, 500);
+  }
+});
+
+const mvSchema = z.object({
+  srcKey: z.string(),
+  dstKey: z.string(),
+});
+
+app.post("/api/mv", zValidator("json", mvSchema), async (c) => {
+  try {
+    const json = c.req.valid("json");
+    const srcKey = normalizeKey(json.srcKey);
+    const dstKey = normalizeKey(json.dstKey);
+
+    // dstKey の存在を確認
+    const dstObject = await c.env.R2.get(dstKey);
+    if (dstObject) {
+      return c.text("Destination file already exists", 409);
+    }
+
+    // srcKey のファイルを取得
+    const srcFile = await c.env.R2.get(srcKey);
+    if (!srcFile) {
+      return c.text("Source file not found", 404);
+    }
+    const body = await srcFile.text();
+    await c.env.R2.put(dstKey, body);
+    await c.env.R2.delete(srcKey);
+    return c.text("Moved", 200);
   } catch (e) {
     return c.text(`Internal Server Error: ${e}`, 500);
   }
