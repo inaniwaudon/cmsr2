@@ -31,13 +31,15 @@ AUTH_TOKEN="<TOKEN>"
 Authorization ヘッダを付与して、以下のエンドポイントを呼び出します。
 
 - GET `/api/lists/:key`  
-  `key` に先頭一致するファイル一覧を取得。`key` が指定されない場合はすべてを取得
+  `key` に先頭一致するファイル一覧を取得。`key` が指定されない場合は全ファイルを取得
 - GET `/api/files/:key`  
   `key` のテキストファイルを取得
-- POST `/api/files/:key`  
-  `key` にテキストファイルを作成／更新
+- PUT `/api/files/:key`  
+  `key` にテキストファイルを作成／更新（upsert）
 - DELETE `/api/files/:key`  
   `key` のファイルを削除
+- POST `/api/mv`  
+  ファイルを移動。`"Content-Type": "application/json"` として `{ "srcKey": "<移動前のキー>", "<移動後のキー>" }` を指定
 
 #### Node.js から Markdown ファイルを取得する例
 
