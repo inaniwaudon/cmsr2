@@ -10,8 +10,12 @@ cd frontend
 yarn run watch
 
 cd hono
-yarn run dev     # localhost:8787 でサーバを起動
-yarn run deploy  # Cloudflare Workers にデプロイ
+# 必要に応じてカスタマイズ
+mv wrangler.jsonc.sample wrangler.json
+# localhost:8787 でサーバを起動
+yarn run dev
+# Cloudflare Workers にデプロイ
+yarn run deploy
 ```
 
 ## 使用方法
@@ -43,7 +47,7 @@ Authorization ヘッダを付与して、以下のエンドポイントを呼び
 
 #### Node.js から Markdown ファイルを取得する例
 
-実際の運用例は [inaniwaudon-minna2](https://github.com/inaniwaudon-minna2) を参照。
+実際の運用例は [inaniwaudon-minna2](https://github.com/inaniwaudon/inaniwaudon-minna2) を参照。
 
 ```ts
 const fetchData = async (path: string) => {
